@@ -99,7 +99,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                         JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.copyUrl"))
                     }
                 } catch (_: Exception) {
-                    JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.browserfail",{url}))
+                    JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.browserfail",url))
                 }
             } else {
                 JOptionPane.showMessageDialog(null,  VoltaBundle.message("node.pre.install.office"))
@@ -126,7 +126,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
 
             label.text = " Node: $versionText "
 
-            label.toolTipText = VoltaBundle.message("node.version.popover",{versionText})
+            label.toolTipText = VoltaBundle.message("node.version.popover",versionText)
         }
 
         override fun ID(): @NotNull String = WIDGET_ID

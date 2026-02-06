@@ -30,7 +30,7 @@ class VoltaVersionPopup(
         }
 
         runWithProgress(
-            VoltaBundle.message("node.install.progress.title",{version}),
+            VoltaBundle.message("node.install.progress.title",version),
             run = {
                 service.installVersion(version)
             },
@@ -98,7 +98,7 @@ class VoltaVersionPopup(
             .setSettingButton(installButton)
             .setItemChosenCallback { selected ->
                 runWithProgress(
-                    VoltaBundle.message("node.switch.title",{selected}),
+                    VoltaBundle.message("node.switch.title",selected),
                     run = {
                         service.switchVersion(selected)
                     },
