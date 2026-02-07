@@ -86,8 +86,8 @@ class VoltaService(private val project: Project) {
     }
 
     fun getPackageNodeVersion(): String? {
-        val pkgFile = project.baseDir.findChild("package.json") ?: return null
-        val pkgText = VfsUtil.loadText(pkgFile)
+        val pkgFile = File("${project.basePath}/package.json")
+        val pkgText = pkgFile.readText()
         val pkgJson = try { JsonParser.parseString(pkgText).asJsonObject } catch (_: Exception) { return null }
 
         // 1. 优先 Volta
@@ -97,8 +97,8 @@ class VoltaService(private val project: Project) {
         pkgJson.getAsJsonObject("engines")?.get("node")?.asString?.let { return it }
 
         // 3. package-lock.json fallback
-        val lockFile = project.baseDir.findChild("package-lock.json") ?: return null
-        val lockText = VfsUtil.loadText(lockFile)
+        val lockFile = File("${project.basePath}/package-lock.json")
+        val lockText = lockFile.readText()
         val lockJson = try { JsonParser.parseString(lockText).asJsonObject } catch (_: Exception) { return null }
 
         val lockfileVersion = lockJson.get("lockfileVersion")?.asInt ?: 1
