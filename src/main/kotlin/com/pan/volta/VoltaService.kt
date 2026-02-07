@@ -1,7 +1,36 @@
 package com.pan.volta
 
+import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VfsUtil
 import java.io.File
+
+// ---------------- Semver 手写 ----------------
+data class Version(val major: Int, val minor: Int = 0, val patch: Int = 0) : Comparable<Version> {
+    companion object {
+        fun parse(v: String): Version? {
+            val clean = v.trim().removePrefix("^").removePrefix("~")
+            val parts = clean.split(".")
+            return try {
+                Version(
+                    parts.getOrNull(0)?.toInt() ?: 0,
+                    parts.getOrNull(1)?.toInt() ?: 0,
+                    parts.getOrNull(2)?.toInt() ?: 0
+                )
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    override fun compareTo(other: Version): Int {
+        if (major != other.major) return major - other.major
+        if (minor != other.minor) return minor - other.minor
+        return patch - other.patch
+    }
+
+    override fun toString(): String = "$major.$minor.$patch"
+}
 
 class VoltaService(private val project: Project) {
 
@@ -56,15 +85,69 @@ class VoltaService(private val project: Project) {
         return if (output.exitCode == 0) output.stdout.trim() else "N/A"
     }
 
+    fun getPackageNodeVersion(): String? {
+        val pkgFile = project.baseDir.findChild("package.json") ?: return null
+        val pkgText = VfsUtil.loadText(pkgFile)
+        val pkgJson = try { JsonParser.parseString(pkgText).asJsonObject } catch (_: Exception) { return null }
+
+        // 1. 优先 Volta
+        pkgJson.getAsJsonObject("volta")?.get("node")?.asString?.let { return it }
+
+        // 2. engines.node
+        pkgJson.getAsJsonObject("engines")?.get("node")?.asString?.let { return it }
+
+        // 3. package-lock.json fallback
+        val lockFile = project.baseDir.findChild("package-lock.json") ?: return null
+        val lockText = VfsUtil.loadText(lockFile)
+        val lockJson = try { JsonParser.parseString(lockText).asJsonObject } catch (_: Exception) { return null }
+
+        val lockfileVersion = lockJson.get("lockfileVersion")?.asInt ?: 1
+        val allVersions = mutableListOf<Version>()
+
+        fun addVersionRange(rangeStr: String) {
+            // 支持 || 分隔
+            rangeStr.split("||").forEach { part ->
+                Version.parse(part.trim().removePrefix("^").removePrefix("~").removePrefix(">=").removePrefix(">"))?.let {
+                    allVersions.add(it)
+                }
+            }
+        }
+
+        if (lockfileVersion >= 3) {
+            lockJson.getAsJsonObject("packages")?.entrySet()?.forEach { entry ->
+                val pkg = entry.value.asJsonObject
+                pkg.getAsJsonObject("engines")?.get("node")?.asString?.let { addVersionRange(it) }
+            }
+        } else {
+            lockJson.getAsJsonObject("dependencies")?.entrySet()?.forEach { entry ->
+                val dep = entry.value.asJsonObject
+                dep.getAsJsonObject("engines")?.get("node")?.asString?.let { addVersionRange(it) }
+            }
+        }
+
+        if (allVersions.isEmpty()) return null
+
+        // 4. 取最大版本
+        val maxVersion = allVersions.maxOrNull() ?: return null
+        return maxVersion.toString()
+    }
+
     fun getProjectRecommendedVersion(): String? {
+
         // 优先 Volta 的 package.json "volta" 字段，其次 .nvmrc
         val pkgFile = File("${project.basePath}/package.json")
+        val pkgText = pkgFile.readText()
+        val v = getPackageNodeVersion()
+        if (v !== null) {
+            return v;
+        }
+
         if (pkgFile.exists()) {
             try {
-                val content = pkgFile.readText()
-                val match = Regex(""""node"\s*:\s*"([^"]+)"""").find(content)
+                val match = Regex(""""node"\s*:\s*"([^"]+)"""").find(pkgText)
                 match?.groupValues?.get(1)?.let { return "v$it" }
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
 
         val nvmrc = File("${project.basePath}/.nvmrc")
@@ -73,8 +156,11 @@ class VoltaService(private val project: Project) {
                 var ver = nvmrc.readText().trim()
                 if (!ver.startsWith("v")) ver = "v$ver"
                 return ver
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
+
+
         return null
     }
 

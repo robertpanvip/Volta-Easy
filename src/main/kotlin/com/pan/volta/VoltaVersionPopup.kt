@@ -1,4 +1,5 @@
 package com.pan.volta
+
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
@@ -85,8 +86,22 @@ class VoltaVersionPopup(
             border = BorderFactory.createEmptyBorder(8, 12, 8, 12)
         }
 
+        // 1. 提取推荐版本相关变量，提升可读性
+        val recommendedVersion = service.getProjectRecommendedVersion()
+        val recommendedVersionText = recommendedVersion?.let {
+            VoltaBundle.message("node.project.recommendation", it)
+        }
+
+// 2. 构建弹窗列表 - 简洁且高性能
+        val list = buildList {
+            // 添加推荐版本（非空时）
+            recommendedVersionText?.let { add(it) }
+            // 批量添加其他版本项（替代forEach，性能更好）
+            addAll(items)
+        }
+
         val popup = JBPopupFactory.getInstance()
-            .createPopupChooserBuilder(items)
+            .createPopupChooserBuilder(list)
             .setTitle("")
             .setRenderer(ListCellRenderer())
             .setSettingButton(installButton)
@@ -94,7 +109,12 @@ class VoltaVersionPopup(
                 runWithProgress(
                     VoltaBundle.message("node.switch.title", selected),
                     run = {
-                        service.switchVersion(selected)
+                        // 简化条件判断，消除currentProject临时变量
+                        if (recommendedVersionText != null && selected == recommendedVersionText) {
+                            service.installVersion("v${recommendedVersion}")
+                        } else {
+                            service.switchVersion(selected)
+                        }
                     },
                     onOk = {
                         refreshStatusBarVersion()
