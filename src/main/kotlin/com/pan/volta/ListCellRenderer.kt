@@ -28,7 +28,8 @@ class ListCellRenderer : DefaultListCellRenderer() {
         val panel = JPanel(BorderLayout()).apply {
             isOpaque = true
             border = BorderFactory.createEmptyBorder(4, 12, 4, 12)
-            preferredSize = java.awt.Dimension(0, 32) // ⭐ 固定行高
+            //preferredSize = java.awt.Dimension(0, 28) // ⭐ 固定行高
+            preferredSize = java.awt.Dimension(getTextWidth(displayText) + 50, 32)
             background = if (isSelected) list.selectionBackground else list.background
         }
 
@@ -50,5 +51,11 @@ class ListCellRenderer : DefaultListCellRenderer() {
         //panel.add(deleteIcon, BorderLayout.EAST)
 
         return panel
+    }
+    // 计算文字的宽度（可以根据需要调整）
+    private fun getTextWidth(text: String): Int {
+        val label= JLabel(text)
+        val fontMetrics = label.getFontMetrics(label.font)
+        return fontMetrics.stringWidth(text)
     }
 }
