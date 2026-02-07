@@ -1,11 +1,9 @@
 package com.pan.volta
-
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.components.labels.LinkLabel
 import com.intellij.vcsUtil.showAbove
 import java.awt.Component
@@ -25,16 +23,21 @@ class VoltaVersionPopup(
 
         val version = input.trim()
         if (version.isBlank()) {
-            JOptionPane.showMessageDialog(null, VoltaBundle.message("node.install.dialog.message"), VoltaBundle.message("node.install.dialog.tip"), JOptionPane.WARNING_MESSAGE)
+            JOptionPane.showMessageDialog(
+                null,
+                VoltaBundle.message("node.install.dialog.message"),
+                VoltaBundle.message("node.install.dialog.tip"),
+                JOptionPane.WARNING_MESSAGE
+            )
             return
         }
 
         runWithProgress(
-            VoltaBundle.message("node.install.progress.title",version),
+            VoltaBundle.message("node.install.progress.title", version),
             run = {
                 service.installVersion(version)
             },
-            onOk = { result->
+            onOk = { result ->
                 showResultDialog(result, VoltaBundle.message("node.install.result.title"))
                 refreshStatusBarVersion()
             }
@@ -42,8 +45,9 @@ class VoltaVersionPopup(
     }
 
     private fun showResultDialog(message: String, title: String) {
-        val type = if (message.contains(VoltaBundle.message("node.install.result.info")) || message.contains("Done")) JOptionPane.INFORMATION_MESSAGE
-        else JOptionPane.ERROR_MESSAGE
+        val type =
+            if (message.contains(VoltaBundle.message("node.install.result.info")) || message.contains("Done")) JOptionPane.INFORMATION_MESSAGE
+            else JOptionPane.ERROR_MESSAGE
         JOptionPane.showMessageDialog(null, message, title, type)
     }
 
@@ -71,7 +75,7 @@ class VoltaVersionPopup(
     private fun refreshStatusBarVersion() = refreshVersion()
 
     fun show(component: Component) {
-        val list = service.getInstalledVersions()
+        val items = service.getInstalledVersions()
         val installButton = LinkLabel<Any>(
             "➕ ${VoltaBundle.message("node.install.button")}",
             null
@@ -80,25 +84,15 @@ class VoltaVersionPopup(
         }.apply {
             border = BorderFactory.createEmptyBorder(8, 12, 8, 12)
         }
+
         val popup = JBPopupFactory.getInstance()
-            .createPopupChooserBuilder(list)
-            .setTitle(VoltaBundle.message("node.version.title"))
-            .setRenderer(object : ColoredListCellRenderer<String>() {
-                override fun customizeCellRenderer(
-                    list: JList<out String>,
-                    value: String?,
-                    index: Int,
-                    selected: Boolean,
-                    hasFocus: Boolean
-                ) {
-                    append(value ?: "")
-                    border = BorderFactory.createEmptyBorder(6, 12, 6, 12)
-                }
-            })
+            .createPopupChooserBuilder(items)
+            .setTitle("")
+            .setRenderer(ListCellRenderer())
             .setSettingButton(installButton)
             .setItemChosenCallback { selected ->
                 runWithProgress(
-                    VoltaBundle.message("node.switch.title",selected),
+                    VoltaBundle.message("node.switch.title", selected),
                     run = {
                         service.switchVersion(selected)
                     },
@@ -108,6 +102,7 @@ class VoltaVersionPopup(
                 )
             }
             .createPopup()
+
         popup.showAbove(component)
     }
 }

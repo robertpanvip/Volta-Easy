@@ -5,6 +5,7 @@ import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NotNull
@@ -50,8 +51,10 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
         private val label: JBLabel = JBLabel(" Node: Loading... ").apply {
             toolTipText = VoltaBundle.message("node.switch.click")
             font = Font("Segoe UI", Font.PLAIN, 12)
-            border = javax.swing.BorderFactory.createEmptyBorder(0, 4, 0, 4)
-
+            // 正确设置文字颜色（适配IDEA明暗主题的绿色）
+            foreground = JBColor(0x4CAF50, 0x66BB6A)
+            //border = javax.swing.BorderFactory.createEmptyBorder(0, 4, 0, 4)
+            border = RoundedBorder()
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.clickCount != 1) return
@@ -124,7 +127,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                 "错误: ${e.message?.take(20) ?: "未知异常"}"
             }
 
-            label.text = " Node: $versionText "
+            label.text = " Node:${versionText.replace("v","",true)} "
 
             label.toolTipText = VoltaBundle.message("node.version.popover",versionText)
         }
