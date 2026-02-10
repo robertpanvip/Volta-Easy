@@ -87,6 +87,9 @@ class VoltaService(private val project: Project) {
 
     fun getPackageNodeVersion(): String? {
         val pkgFile = File("${project.basePath}/package.json")
+        if (!pkgFile.exists()) {
+            return null;
+        }
         val pkgText = pkgFile.readText()
         val pkgJson = try { JsonParser.parseString(pkgText).asJsonObject } catch (_: Exception) { return null }
 
@@ -98,6 +101,9 @@ class VoltaService(private val project: Project) {
 
         // 3. package-lock.json fallback
         val lockFile = File("${project.basePath}/package-lock.json")
+        if (!lockFile.exists()) {
+            return null;
+        }
         val lockText = lockFile.readText()
         val lockJson = try { JsonParser.parseString(lockText).asJsonObject } catch (_: Exception) { return null }
 
@@ -121,6 +127,7 @@ class VoltaService(private val project: Project) {
         } else {
             lockJson.getAsJsonObject("dependencies")?.entrySet()?.forEach { entry ->
                 val dep = entry.value.asJsonObject
+
                 dep.getAsJsonObject("engines")?.get("node")?.asString?.let { addVersionRange(it) }
             }
         }
@@ -136,6 +143,9 @@ class VoltaService(private val project: Project) {
 
         // 优先 Volta 的 package.json "volta" 字段，其次 .nvmrc
         val pkgFile = File("${project.basePath}/package.json")
+        if (!pkgFile.exists()) {
+            return null;
+        }
         val pkgText = pkgFile.readText()
         val v = getPackageNodeVersion()
         if (v !== null) {
