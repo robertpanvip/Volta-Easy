@@ -28,4 +28,10 @@
     <extensions defaultExtensionNs="com.intellij">
         <statusBarWidgetFactory implementation="com.pan.volta.VoltaStatusWidgetFactory" id="VoltaEasyStatusWidget" />
     </extensions>
+    <applicationListeners>
+        <listener
+                class="com.pan.volta.VoltaActivationListener"
+                topic="com.intellij.openapi.application.ApplicationActivationListener"/>
+    </applicationListeners>
 </idea-plugin>
+
