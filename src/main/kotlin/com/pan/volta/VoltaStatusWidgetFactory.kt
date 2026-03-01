@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.NotNull
 import java.awt.Desktop
 import java.awt.Font
+import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseEvent
@@ -30,22 +31,39 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
     VoltaBundle.message("node.title")
 
     override fun createWidget(@NotNull project: Project): @NotNull StatusBarWidget {
+        this.watchFocus();
         //return VoltaStatusWidget(project).also { currentWidget = it }
         return VoltaStatusWidget(project).also { widget ->
-            currentWidget = widget
+            //currentWidget = widget
+            registerWidget(project, widget)
             SwingUtilities.invokeLater {
                 widget.updateLabelText()
             }
         }
     }
 
+    fun watchFocus(){
+        if (!focusListenerRegistered) {
+            KeyboardFocusManager.getCurrentKeyboardFocusManager()
+                .addPropertyChangeListener("activeWindow") {
+                    SwingUtilities.invokeLater { refreshVersion() }
+                }
+            focusListenerRegistered = true
+        }
+    }
+
     override fun isAvailable(@NotNull project: Project): Boolean = true
-    override fun disposeWidget(@NotNull widget: StatusBarWidget) { currentWidget = null }
+    override fun disposeWidget(@NotNull widget: StatusBarWidget) {
+        //currentWidget = null
+        if (widget is VoltaStatusWidget) {
+            unregisterWidget(widget.project)
+        }
+    }
     override fun canBeEnabledOn(@NotNull statusBar: StatusBar): Boolean = true
     override fun isEnabledByDefault(): Boolean = true
     override fun isConfigurable(): Boolean = false
 
-    class VoltaStatusWidget(private val project: Project) : CustomStatusBarWidget {
+    class VoltaStatusWidget(val project: Project) : CustomStatusBarWidget {
         private val service = VoltaService(project)
 
         private val label: JBLabel = JBLabel(" Node: Loading... ").apply {
@@ -139,11 +157,23 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
     }
 }
 
-private var currentWidget: VoltaStatusWidgetFactory.VoltaStatusWidget? = null
+private val widgetMap = mutableMapOf<Project, VoltaStatusWidgetFactory.VoltaStatusWidget>()
+
+fun registerWidget(project: Project, widget: VoltaStatusWidgetFactory.VoltaStatusWidget) {
+    widgetMap[project] = widget
+}
+
+fun unregisterWidget(project: Project) {
+    widgetMap.remove(project)
+}
 
 fun refreshVersion() {
-    currentWidget?.updateLabelText()
+    widgetMap.values.forEach { it.updateLabelText() }
+    /*currentWidget?.updateLabelText()
     SwingUtilities.invokeLater {
+        widgetMap.values.forEach { it.updateLabelText() }
         currentWidget?.updateLabelText()
-    }
+    }*/
 }
+
+private var focusListenerRegistered = false
