@@ -28,7 +28,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
     override fun getId(): @NotNull String = WIDGET_ID
 
     override fun getDisplayName(): @Nls(capitalization = Nls.Capitalization.Title) String =
-    VoltaBundle.message("node.title")
+        VoltaBundle.message("node.title")
 
     override fun createWidget(@NotNull project: Project): @NotNull StatusBarWidget {
         this.watchFocus();
@@ -42,7 +42,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
         }
     }
 
-    fun watchFocus(){
+    fun watchFocus() {
         if (!focusListenerRegistered) {
             KeyboardFocusManager.getCurrentKeyboardFocusManager()
                 .addPropertyChangeListener("activeWindow") {
@@ -59,19 +59,19 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
             unregisterWidget(widget.project)
         }
     }
+
     override fun canBeEnabledOn(@NotNull statusBar: StatusBar): Boolean = true
     override fun isEnabledByDefault(): Boolean = true
     override fun isConfigurable(): Boolean = false
 
     class VoltaStatusWidget(val project: Project) : CustomStatusBarWidget {
         private val service = VoltaService(project)
-
+        private val versionPopup = VoltaVersionPopup(project, service)
         private val label: JBLabel = JBLabel(" Node: Loading... ").apply {
             toolTipText = VoltaBundle.message("node.switch.click")
             font = Font("Segoe UI", Font.PLAIN, 12)
             // 正确设置文字颜色（适配IDEA明暗主题的绿色）
             foreground = JBColor(0x4CAF50, 0x66BB6A)
-            //border = javax.swing.BorderFactory.createEmptyBorder(0, 4, 0, 4)
             border = RoundedBorder()
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
@@ -80,7 +80,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                         if (!service.isVoltaInstalled()) {
                             showVoltaInstallPrompt()
                         } else {
-                            VoltaVersionPopup(project, service).show(label)
+                            versionPopup.show(label)
                         }
                     }
                 }
@@ -120,10 +120,10 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                         JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.copyUrl"))
                     }
                 } catch (_: Exception) {
-                    JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.browserfail",url))
+                    JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.browserfail", url))
                 }
             } else {
-                JOptionPane.showMessageDialog(null,  VoltaBundle.message("node.pre.install.office"))
+                JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.office"))
             }
         }
 
@@ -132,22 +132,28 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                 SwingUtilities.invokeLater { updateLabelText() }
                 return
             }
+            versionPopup.runWithProgress(
+                VoltaBundle.message("node.switch.title", "--"),
+                run = {
+                    val versionText = try {
+                        if (service.isVoltaInstalled()) {
+                            val ver = service.getCurrentNodeVersion()
+                            if (ver.isBlank() || ver == "Unknown") VoltaBundle.message("node.version.unknown")
+                            else ver
+                        } else {
+                            VoltaBundle.message("node.version.notinstalled")
+                        }
+                    } catch (e: Exception) {
+                        "错误: ${e.message?.take(20) ?: "未知异常"}"
+                    }
+                    versionText
+                },
+                onOk = { result ->
+                    label.text = " Node:${result.replace("v", "", true)} "
 
-            val versionText = try {
-                if (service.isVoltaInstalled()) {
-                    val ver = service.getCurrentNodeVersion()
-                    if (ver.isBlank() || ver == "Unknown") VoltaBundle.message("node.version.unknown")
-                    else ver
-                } else {
-                    VoltaBundle.message("node.version.notinstalled")
-                }
-            } catch (e: Exception) {
-                "错误: ${e.message?.take(20) ?: "未知异常"}"
-            }
+                    label.toolTipText = VoltaBundle.message("node.version.popover", result)
+                })
 
-            label.text = " Node:${versionText.replace("v","",true)} "
-
-            label.toolTipText = VoltaBundle.message("node.version.popover",versionText)
         }
 
         override fun ID(): @NotNull String = WIDGET_ID
@@ -168,12 +174,9 @@ fun unregisterWidget(project: Project) {
 }
 
 fun refreshVersion() {
-    widgetMap.values.forEach { it.updateLabelText() }
-    /*currentWidget?.updateLabelText()
     SwingUtilities.invokeLater {
         widgetMap.values.forEach { it.updateLabelText() }
-        currentWidget?.updateLabelText()
-    }*/
+    }
 }
 
 private var focusListenerRegistered = false

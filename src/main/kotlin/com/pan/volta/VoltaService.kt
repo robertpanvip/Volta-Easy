@@ -35,8 +35,12 @@ data class Version(val major: Int, val minor: Int = 0, val patch: Int = 0) : Com
 class VoltaService(private val project: Project) {
 
     fun getCurrentNodeVersion(): String {
-        val output = execute(arrayOf("node", "-v"))
-        return if (output.exitCode == 0) output.stdout.trim() else "Unknown"
+        val output = execute(arrayOf("volta", "list", "node", "--current"))
+        if (output.exitCode != 0) return "Unknown"
+        // 用正则提取 vX.Y.Z
+        val regex = Regex("""node@(\d+\.\d+\.\d+)""")
+        val version= regex.find(output.stdout.trim())?.groups?.get(1)?.value ?: "Unknown"
+        return version
     }
 
     fun isVoltaInstalled(): Boolean {
