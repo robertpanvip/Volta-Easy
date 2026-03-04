@@ -1,6 +1,7 @@
 package com.pan.volta
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
@@ -67,7 +68,12 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
     class VoltaStatusWidget(val project: Project) : CustomStatusBarWidget {
         private val service = VoltaService(project)
         private val versionPopup = VoltaVersionPopup(project, service)
-        private val label: JBLabel = JBLabel(" Node: Loading... ").apply {
+        private val nodeIcon = IconLoader.getIcon(
+            "/icons/node.svg",
+            javaClass
+        )
+
+        private val label: JBLabel = JBLabel(" Node: Loading... ",nodeIcon, JBLabel.LEFT).apply {
             toolTipText = VoltaBundle.message("node.switch.click")
             font = Font("Segoe UI", Font.PLAIN, 12)
             // 正确设置文字颜色（适配IDEA明暗主题的绿色）
@@ -149,7 +155,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                     versionText
                 },
                 onOk = { result ->
-                    label.text = " Node:${result.replace("v", "", true)} "
+                    label.text = " ${result.replace("v", "", true)} "
 
                     label.toolTipText = VoltaBundle.message("node.version.popover", result)
                 })
