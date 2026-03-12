@@ -2,7 +2,6 @@ package com.pan.volta
 
 import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VfsUtil
 import java.io.File
 
 // ---------------- Semver 手写 ----------------
@@ -181,32 +180,57 @@ class VoltaService(private val project: Project) {
     private fun execute(command: Array<String>): ProcessOutput {
         val stdout = StringBuilder()
         val stderr = StringBuilder()
-        var exitCode = 1
+        var exitCode = -1
 
+        var process: Process? = null
         try {
             val pb = ProcessBuilder(*command)
-                .directory(File(project.basePath ?: System.getProperty("user.dir")))
+                .directory(File(project.basePath ?: return ProcessOutput("", "No project path", -1)))
                 .redirectErrorStream(false)
 
-            val process = pb.start()
+            process = pb.start()
 
-            process.inputStream.bufferedReader().use { reader ->
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    stdout.append(line).append("\n")
+            // 用线程读取流，避免阻塞（推荐做法，虽然你当前代码已分别读，但加超时更安全）
+            val stdoutThread = Thread {
+                process.inputStream.bufferedReader().use { reader ->
+                    reader.forEachLine { stdout.append(it).append("\n") }
                 }
+            }.apply { start() }
+
+            val stderrThread = Thread {
+                process.errorStream.bufferedReader().use { reader ->
+                    reader.forEachLine { stderr.append(it).append("\n") }
+                }
+            }.apply { start() }
+
+            // 等待完成，但最多等 8 秒
+            if (process.waitFor(8, java.util.concurrent.TimeUnit.SECONDS)) {
+                exitCode = process.exitValue()
+            } else {
+                // 超时 → 强制杀
+                process.destroyForcibly()           // 先温和 destroy
+                process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)  // 再等一会
+                if (process.isAlive) {
+                    // 极端情况再强制（Windows 上 destroyForcibly 更接近 kill -9）
+                    // 但 destroyForcibly 已经是 forceful 了，这里只是再确认
+                }
+                stderr.append("执行超时，已强制终止 (可能有残留子进程)")
+                exitCode = -2
             }
 
-            process.errorStream.bufferedReader().use { reader ->
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    stderr.append(line).append("\n")
-                }
-            }
+            // 确保读取线程结束
+            stdoutThread.join(1000)
+            stderrThread.join(1000)
 
-            exitCode = process.waitFor()
         } catch (e: Exception) {
-            stderr.append("执行异常：${e.message}")
+            stderr.append("执行异常：${e.message}\n")
+            process?.destroyForcibly()
+        } finally {
+            process?.let {
+                if (it.isAlive) {
+                    it.destroyForcibly()
+                }
+            }
         }
 
         return ProcessOutput(stdout.toString().trim(), stderr.toString().trim(), exitCode)
