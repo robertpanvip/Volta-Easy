@@ -73,7 +73,7 @@ class VoltaVersionPopup(
         )
     }
 
-    private fun refreshStatusBarVersion() = refreshVersion()
+    private fun refreshStatusBarVersion() = refreshVersionForActiveWindow()
 
     fun show(component: Component) {
         val items = service.getInstalledVersions()

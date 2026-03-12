@@ -1,11 +1,10 @@
 package com.pan.volta
 
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.IconLoader
-import com.intellij.openapi.wm.CustomStatusBarWidget
-import com.intellij.openapi.wm.StatusBar
-import com.intellij.openapi.wm.StatusBarWidget
-import com.intellij.openapi.wm.StatusBarWidgetFactory
+import com.intellij.openapi.wm.*
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import org.jetbrains.annotations.Nls
@@ -14,12 +13,14 @@ import java.awt.Desktop
 import java.awt.Font
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
+import java.awt.Window
 import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseEvent
 import java.net.URI
 import javax.swing.JComponent
 import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
+
 
 class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
     companion object {
@@ -47,7 +48,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
         if (!focusListenerRegistered) {
             KeyboardFocusManager.getCurrentKeyboardFocusManager()
                 .addPropertyChangeListener("activeWindow") {
-                    SwingUtilities.invokeLater { refreshVersion() }
+                    SwingUtilities.invokeLater { refreshVersionForActiveWindow() }
                 }
             focusListenerRegistered = true
         }
@@ -73,7 +74,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
             javaClass
         )
 
-        private val label: JBLabel = JBLabel(" Node: Loading... ",nodeIcon, JBLabel.LEFT).apply {
+        private val label: JBLabel = JBLabel(" Node: Loading... ", nodeIcon, JBLabel.LEFT).apply {
             toolTipText = VoltaBundle.message("node.switch.click")
             font = Font("Segoe UI", Font.PLAIN, 12)
             // 正确设置文字颜色（适配IDEA明暗主题的绿色）
@@ -138,6 +139,11 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                 SwingUtilities.invokeLater { updateLabelText() }
                 return
             }
+            // 避免在IDE索引期间执行耗时操作
+            if (DumbService.isDumb(project)) {
+                DumbService.getInstance(project).runWhenSmart { updateLabelText() }
+                return
+            }
             versionPopup.runWithProgress(
                 VoltaBundle.message("node.switch.title", "--"),
                 run = {
@@ -179,9 +185,29 @@ fun unregisterWidget(project: Project) {
     widgetMap.remove(project)
 }
 
-fun refreshVersion() {
+private fun findActiveProject(): Project? {
+    val windowManager = WindowManager.getInstance()
+
+    // 遍历所有打开的 Project
+    for (project in ProjectManager.getInstance().openProjects) {
+        val frame = windowManager.getFrame(project) as? IdeFrame ?: continue
+
+        // IdeFrame 内部持有的 Window 是否是当前系统前台/激活窗口
+        val window = frame.component?.topLevelAncestor as? Window ?: continue
+
+        if (window.isActive) {
+            return project
+        }
+    }
+
+    // 兜底：如果没找到（极少发生），返回 null 或任意一个
+    return null
+}
+
+fun refreshVersionForActiveWindow() {
     SwingUtilities.invokeLater {
-        widgetMap.values.forEach { it.updateLabelText() }
+        val active = findActiveProject()
+        widgetMap[active]?.updateLabelText()
     }
 }
 

@@ -7,7 +7,7 @@ class VoltaActivationListener : ApplicationActivationListener {
 
     override fun applicationActivated(ideFrame: IdeFrame) {
         // 当 IDE 从后台切回前台时触发
-        refreshVersion()
+        refreshVersionForActiveWindow()
     }
 }
 
