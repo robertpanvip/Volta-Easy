@@ -144,7 +144,8 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                 DumbService.getInstance(project).runWhenSmart { updateLabelText() }
                 return
             }
-            versionPopup.runWithProgress(
+            runWithProgress(
+                project,
                 VoltaBundle.message("node.switch.title", "--"),
                 run = {
                     val versionText = try {

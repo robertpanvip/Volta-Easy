@@ -3,6 +3,7 @@ package com.pan.volta
 import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
 import java.io.File
+import java.util.zip.ZipInputStream
 
 // ---------------- Semver 手写 ----------------
 data class Version(val major: Int, val minor: Int = 0, val patch: Int = 0) : Comparable<Version> {
@@ -31,14 +32,64 @@ data class Version(val major: Int, val minor: Int = 0, val patch: Int = 0) : Com
     override fun toString(): String = "$major.$minor.$patch"
 }
 
+fun getVoltaHome(): File {
+
+    val env = System.getenv("VOLTA_HOME")
+    if (!env.isNullOrBlank()) {
+        return File(env)
+    }
+
+    val userHome = System.getProperty("user.home")
+
+    return if (System.getProperty("os.name").contains("Windows")) {
+        File(System.getenv("LOCALAPPDATA"), "Volta")
+    } else {
+        File(userHome, ".volta")
+    }
+}
+
 class VoltaService(private val project: Project) {
 
+    fun installNodeFromZip(zipPath: String) {
+        val zipFile = File(zipPath)
+        if (!zipFile.exists()) {
+            throw RuntimeException("Zip file not found: $zipPath")
+        }
+
+        val versionRegex = Regex("node-v([\\d.]+)")
+        val match = versionRegex.find(zipFile.name)
+            ?: throw RuntimeException("Cannot parse Node version from zip name")
+
+        val version = match.groupValues[1]
+
+        // 1. 获取 Volta Home
+        val voltaHome = getVoltaHome()
+        val inventoryDir = File(voltaHome, "tools/inventory/node")
+        inventoryDir.mkdirs()
+
+        // 2. 复制 zip 到 inventory
+        val targetZip = File(inventoryDir, zipFile.name)
+        zipFile.copyTo(targetZip, overwrite = true)
+
+        // 3. 调用 Volta CLI 安装 Node
+        val processBuilder = ProcessBuilder().apply {
+            command("volta", "install", "node@$version")
+            inheritIO() // 可选：把输出打印到控制台
+        }
+
+        val process = processBuilder.start()
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            throw RuntimeException("Volta install failed with exit code $exitCode")
+        }
+    }
+
     fun getCurrentNodeVersion(): String {
-        val output = execute(arrayOf("volta", "list", "node", "--current"))
+        val output = execute(arrayOf("volta", "list", "node", "--current"),8)
         if (output.exitCode != 0) return "Unknown"
         // 用正则提取 vX.Y.Z
         val regex = Regex("""node@(\d+\.\d+\.\d+)""")
-        val version= regex.find(output.stdout.trim())?.groups?.get(1)?.value ?: "Unknown"
+        val version = regex.find(output.stdout.trim())?.groups?.get(1)?.value ?: "Unknown"
         return version
     }
 
@@ -72,9 +123,25 @@ class VoltaService(private val project: Project) {
     }
 
     fun uninstallVersion(version: String): String {
-        val output = execute(arrayOf("volta", "uninstall", "node@$version"))
-        return if (output.exitCode == 0) "卸载成功：Node $version"
-        else "卸载失败：${output.stderr}"
+        try {
+            // 1. 尝试用 Volta CLI 卸载
+            val output = execute(arrayOf("volta", "uninstall", "node@$version"))
+
+            if (output.exitCode == 0) {
+                return "卸载成功：Node $version"
+            }
+            // CLI 卸载失败，尝试手动删除 image
+            val voltaHome = getVoltaHome()
+            // 去掉前缀 v
+            val cleanVersion = version.removePrefix("v")
+            val imageDir = File(voltaHome, "tools/image/node/$cleanVersion")
+            if (imageDir.exists()) {
+                imageDir.deleteRecursively()
+            }
+            return "卸载完成（手动删除）：Node $version"
+        } catch (e: Exception) {
+            return "卸载失败：${e.message}"
+        }
     }
 
     fun pinToProject(version: String): String {
@@ -94,7 +161,11 @@ class VoltaService(private val project: Project) {
             return null;
         }
         val pkgText = pkgFile.readText()
-        val pkgJson = try { JsonParser.parseString(pkgText).asJsonObject } catch (_: Exception) { return null }
+        val pkgJson = try {
+            JsonParser.parseString(pkgText).asJsonObject
+        } catch (_: Exception) {
+            return null
+        }
 
         // 1. 优先 Volta
         pkgJson.getAsJsonObject("volta")?.get("node")?.asString?.let { return it }
@@ -108,7 +179,11 @@ class VoltaService(private val project: Project) {
             return null;
         }
         val lockText = lockFile.readText()
-        val lockJson = try { JsonParser.parseString(lockText).asJsonObject } catch (_: Exception) { return null }
+        val lockJson = try {
+            JsonParser.parseString(lockText).asJsonObject
+        } catch (_: Exception) {
+            return null
+        }
 
         val lockfileVersion = lockJson.get("lockfileVersion")?.asInt ?: 1
         val allVersions = mutableListOf<Version>()
@@ -116,9 +191,10 @@ class VoltaService(private val project: Project) {
         fun addVersionRange(rangeStr: String) {
             // 支持 || 分隔
             rangeStr.split("||").forEach { part ->
-                Version.parse(part.trim().removePrefix("^").removePrefix("~").removePrefix(">=").removePrefix(">"))?.let {
-                    allVersions.add(it)
-                }
+                Version.parse(part.trim().removePrefix("^").removePrefix("~").removePrefix(">=").removePrefix(">"))
+                    ?.let {
+                        allVersions.add(it)
+                    }
             }
         }
 
@@ -177,7 +253,7 @@ class VoltaService(private val project: Project) {
         return null
     }
 
-    private fun execute(command: Array<String>): ProcessOutput {
+    private fun execute(command: Array<String>, timeout: Long = 30): ProcessOutput {
         val stdout = StringBuilder()
         val stderr = StringBuilder()
         var exitCode = -1
@@ -204,7 +280,7 @@ class VoltaService(private val project: Project) {
             }.apply { start() }
 
             // 等待完成，但最多等 8 秒
-            if (process.waitFor(8, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (process.waitFor(timeout, java.util.concurrent.TimeUnit.SECONDS)) {
                 exitCode = process.exitValue()
             } else {
                 // 超时 → 强制杀

@@ -1,5 +1,7 @@
 package com.pan.volta
 
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
@@ -7,8 +9,31 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.components.labels.LinkLabel
 import com.intellij.vcsUtil.showAbove
+import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.*
+
+fun runWithProgress(
+    project:Project,
+    title: String,
+    run: () -> String,            // 后台执行逻辑，返回结果字符串
+    onOk: (result: String) -> Unit        // 完成后的回调，接收 run 的返回值
+) {
+    ProgressManager.getInstance().run(
+        object : Task.Backgroundable(project, title, true) {
+            override fun run(indicator: ProgressIndicator) {
+                // 指示器可以显示正在运行
+                indicator.isIndeterminate = true
+                // 实际切换
+                val result = run()
+                // UI 更新必须在 EDT
+                SwingUtilities.invokeLater {
+                    onOk(result)
+                }
+            }
+        }
+    )
+}
 
 class VoltaVersionPopup(
     private val project: Project,
@@ -34,6 +59,7 @@ class VoltaVersionPopup(
         }
 
         runWithProgress(
+            project,
             VoltaBundle.message("node.install.progress.title", version),
             run = {
                 service.installVersion(version)
@@ -52,28 +78,27 @@ class VoltaVersionPopup(
         JOptionPane.showMessageDialog(null, message, title, type)
     }
 
-    fun runWithProgress(
-        title: String,
-        run: () -> String,            // 后台执行逻辑，返回结果字符串
-        onOk: (result: String) -> Unit        // 完成后的回调，接收 run 的返回值
-    ) {
-        ProgressManager.getInstance().run(
-            object : Task.Backgroundable(project, title, true) {
-                override fun run(indicator: ProgressIndicator) {
-                    // 指示器可以显示正在运行
-                    indicator.isIndeterminate = true
-                    // 实际切换
-                    val result = run()
-                    // UI 更新必须在 EDT
-                    SwingUtilities.invokeLater {
-                        onOk(result)
-                    }
-                }
-            }
-        )
-    }
-
     private fun refreshStatusBarVersion() = refreshVersionForActiveWindow()
+
+
+    private fun showManageMenu(component: Component) {
+        val group = DefaultActionGroup().apply {
+            add(InstallFromDiskAction(project, service))
+            addSeparator()
+            add(ManageNodeVersionsAction(project, service,) { installNewVersion() })
+        }
+
+        val popup = JBPopupFactory.getInstance()
+            .createActionGroupPopup(
+                "Volta",
+                group,
+                SimpleDataContext.getProjectContext(project),
+                JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                true
+            )
+
+        popup.showUnderneathOf(component)
+    }
 
     fun show(component: Component) {
         val items = service.getInstalledVersions()
@@ -84,6 +109,20 @@ class VoltaVersionPopup(
             installNewVersion()
         }.apply {
             border = BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        }
+
+        val manageButton = LinkLabel<Any>(
+            "⚙ ${VoltaBundle.message("node.manage.button")}",
+            null
+        ) { _, _ ->
+            showManageMenu(component)
+        }.apply {
+            border = BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        }
+
+        val buttonPanel = JPanel(BorderLayout()).apply {
+            add(installButton, BorderLayout.WEST)
+            add(manageButton, BorderLayout.EAST)
         }
 
         // 1. 提取推荐版本相关变量，提升可读性
@@ -104,9 +143,10 @@ class VoltaVersionPopup(
             .createPopupChooserBuilder(list)
             .setTitle("")
             .setRenderer(ListCellRenderer())
-            .setSettingButton(installButton)
+            .setSettingButton(buttonPanel)
             .setItemChosenCallback { selected ->
                 runWithProgress(
+                    project,
                     VoltaBundle.message("node.switch.title", selected),
                     run = {
                         // 简化条件判断，消除currentProject临时变量
