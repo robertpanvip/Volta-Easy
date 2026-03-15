@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.pan"
-version = "1.2.2"
+version = "1.3.0"
 
 repositories {
     mavenCentral()
@@ -35,7 +35,7 @@ intellijPlatform {
         }
 
         changeNotes = """
-      Initial version
+      add Version manage
     """.trimIndent()
     }
 }
