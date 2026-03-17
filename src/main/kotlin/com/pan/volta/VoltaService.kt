@@ -69,7 +69,8 @@ class VoltaService(private val project: Project) {
 
         // 1. 获取 Volta Home
         val voltaHome = getVoltaHome()
-        val inventoryDir = File(voltaHome, "tools/inventory/node")
+
+        val inventoryDir = File(voltaHome, "tools${File.separator}inventory${File.separator}node")
         inventoryDir.mkdirs()
 
         // 2. 复制 zip 到 inventory
