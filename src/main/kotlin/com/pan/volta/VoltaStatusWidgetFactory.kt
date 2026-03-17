@@ -30,7 +30,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
     override fun getId(): @NotNull String = WIDGET_ID
 
     override fun getDisplayName(): @Nls(capitalization = Nls.Capitalization.Title) String =
-        VoltaBundle.message("node.title")
+        t("node.title")
 
     override fun createWidget(@NotNull project: Project): @NotNull StatusBarWidget {
         this.watchFocus();
@@ -75,7 +75,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
         )
 
         private val label: JBLabel = JBLabel(" Node: Loading... ", nodeIcon, JBLabel.LEFT).apply {
-            toolTipText = VoltaBundle.message("node.switch.click")
+            toolTipText = t("node.switch.click")
             font = Font("Segoe UI", Font.PLAIN, 12)
             // 正确设置文字颜色（适配IDEA明暗主题的绿色）
             foreground = JBColor(0x4CAF50, 0x66BB6A)
@@ -100,8 +100,8 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
             if (hasShownPrompt) {
                 JOptionPane.showMessageDialog(
                     null,
-                    VoltaBundle.message("node.pre.install.office"),
-                    VoltaBundle.message("node.pre.install.title"),
+                    t("node.pre.install.office"),
+                    t("node.pre.install.title"),
                     JOptionPane.WARNING_MESSAGE
                 )
                 return
@@ -109,8 +109,8 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
 
             val choice = JOptionPane.showConfirmDialog(
                 null,
-                VoltaBundle.message("node.pre.install.message").trimIndent(),
-                VoltaBundle.message("node.pre.install.needed"),
+                t("node.pre.install.message").trimIndent(),
+                t("node.pre.install.needed"),
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.INFORMATION_MESSAGE
             )
@@ -124,13 +124,13 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                         Desktop.getDesktop().browse(URI(url))
                     } else {
                         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(url), null)
-                        JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.copyUrl"))
+                        JOptionPane.showMessageDialog(null, t("node.pre.install.copyUrl"))
                     }
                 } catch (_: Exception) {
-                    JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.browserfail", url))
+                    JOptionPane.showMessageDialog(null, t("node.pre.install.browserfail", url))
                 }
             } else {
-                JOptionPane.showMessageDialog(null, VoltaBundle.message("node.pre.install.office"))
+                JOptionPane.showMessageDialog(null, t("node.pre.install.office"))
             }
         }
 
@@ -146,15 +146,15 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
             }
             runWithProgress(
                 project,
-                VoltaBundle.message("node.switch.title", "--"),
+                t("node.switch.title", "--"),
                 run = {
                     val versionText = try {
                         if (service.isVoltaInstalled()) {
                             val ver = service.getCurrentNodeVersion()
-                            if (ver.isBlank() || ver == "Unknown") VoltaBundle.message("node.version.unknown")
+                            if (ver.isBlank() || ver == "Unknown") t("node.version.unknown")
                             else ver
                         } else {
-                            VoltaBundle.message("node.version.notinstalled")
+                            t("node.version.notinstalled")
                         }
                     } catch (e: Exception) {
                         "错误: ${e.message?.take(20) ?: "未知异常"}"
@@ -164,7 +164,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                 onOk = { result ->
                     label.text = " ${result.replace("v", "", true)} "
 
-                    label.toolTipText = VoltaBundle.message("node.version.popover", result)
+                    label.toolTipText = t("node.version.popover", result)
                 })
 
         }

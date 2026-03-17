@@ -8,7 +8,7 @@ import com.intellij.openapi.project.Project
 import javax.swing.JOptionPane
 
 class InstallFromDiskAction(private val project: Project, private val service: VoltaService) :
-    AnAction("Install Node From Disk") {
+    AnAction(t("install.node.from.disk")) {
 
     override fun actionPerformed(e: AnActionEvent) {
 
@@ -17,10 +17,11 @@ class InstallFromDiskAction(private val project: Project, private val service: V
         )
 
         val file = FileChooser.chooseFile(descriptor, project, null) ?: return
-        runWithProgress(project, "install ...", {
+        val version=getVersionByFileName(file.name);
+        runWithProgress(project, t("install.version", version ?: "--"), {
             try {
                 service.installNodeFromZip(file.path)
-                "Success"
+                t("success.install")
             } catch (e: Exception) {
                 e.message
             }.toString()

@@ -3,7 +3,7 @@ package com.pan.volta
 import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
 import java.io.File
-import java.util.zip.ZipInputStream
+import java.nio.file.Paths
 
 // ---------------- Semver 手写 ----------------
 data class Version(val major: Int, val minor: Int = 0, val patch: Int = 0) : Comparable<Version> {
@@ -48,6 +48,14 @@ fun getVoltaHome(): File {
     }
 }
 
+fun getVersionByFileName(fileName: String): String? {
+    val versionRegex = Regex("node-v([\\d.]+)")
+    val match = versionRegex.find(fileName)
+        ?: throw RuntimeException("Cannot parse Node version from zip name")
+    val version = match.groupValues[1]
+    return version;
+}
+
 class VoltaService(private val project: Project) {
 
     fun installNodeFromZip(zipPath: String) {
@@ -56,11 +64,7 @@ class VoltaService(private val project: Project) {
             throw RuntimeException("Zip file not found: $zipPath")
         }
 
-        val versionRegex = Regex("node-v([\\d.]+)")
-        val match = versionRegex.find(zipFile.name)
-            ?: throw RuntimeException("Cannot parse Node version from zip name")
-
-        val version = match.groupValues[1]
+        val version = getVersionByFileName(zipFile.name)
 
         // 1. 获取 Volta Home
         val voltaHome = getVoltaHome()

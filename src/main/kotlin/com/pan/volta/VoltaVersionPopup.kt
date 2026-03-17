@@ -42,8 +42,8 @@ class VoltaVersionPopup(
     private fun installNewVersion() {
         val input = JOptionPane.showInputDialog(
             null,
-            VoltaBundle.message("node.install.new.message"),
-            VoltaBundle.message("node.install.new.title"),
+            t("node.install.new.message"),
+            t("node.install.new.title"),
             JOptionPane.QUESTION_MESSAGE
         ) ?: return
 
@@ -51,8 +51,8 @@ class VoltaVersionPopup(
         if (version.isBlank()) {
             JOptionPane.showMessageDialog(
                 null,
-                VoltaBundle.message("node.install.dialog.message"),
-                VoltaBundle.message("node.install.dialog.tip"),
+                t("node.install.dialog.message"),
+                t("node.install.dialog.tip"),
                 JOptionPane.WARNING_MESSAGE
             )
             return
@@ -60,12 +60,12 @@ class VoltaVersionPopup(
 
         runWithProgress(
             project,
-            VoltaBundle.message("node.install.progress.title", version),
+            t("node.install.progress.title", version),
             run = {
                 service.installVersion(version)
             },
             onOk = { result ->
-                showResultDialog(result, VoltaBundle.message("node.install.result.title"))
+                showResultDialog(result, t("node.install.result.title"))
                 refreshStatusBarVersion()
             }
         )
@@ -73,7 +73,7 @@ class VoltaVersionPopup(
 
     private fun showResultDialog(message: String, title: String) {
         val type =
-            if (message.contains(VoltaBundle.message("node.install.result.info")) || message.contains("Done")) JOptionPane.INFORMATION_MESSAGE
+            if (message.contains(t("node.install.result.info")) || message.contains("Done")) JOptionPane.INFORMATION_MESSAGE
             else JOptionPane.ERROR_MESSAGE
         JOptionPane.showMessageDialog(null, message, title, type)
     }
@@ -96,14 +96,13 @@ class VoltaVersionPopup(
                 JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
                 true
             )
-
-        popup.showUnderneathOf(component)
+        popup.showAbove(component)
     }
 
     fun show(component: Component) {
         val items = service.getInstalledVersions()
         val installButton = LinkLabel<Any>(
-            "➕ ${VoltaBundle.message("node.install.button")}",
+            "➕ ${t("node.install.button")}",
             null
         ) { _, _ ->
             installNewVersion()
@@ -112,7 +111,7 @@ class VoltaVersionPopup(
         }
 
         val manageButton = LinkLabel<Any>(
-            "⚙ ${VoltaBundle.message("node.manage.button")}",
+            "⚙ ${t("node.manage.button")}",
             null
         ) { _, _ ->
             showManageMenu(component)
@@ -128,7 +127,7 @@ class VoltaVersionPopup(
         // 1. 提取推荐版本相关变量，提升可读性
         val recommendedVersion = service.getProjectRecommendedVersion()
         val recommendedVersionText = recommendedVersion?.let {
-            VoltaBundle.message("node.project.recommendation", it)
+            t("node.project.recommendation", it)
         }
 
 // 2. 构建弹窗列表 - 简洁且高性能
@@ -147,7 +146,7 @@ class VoltaVersionPopup(
             .setItemChosenCallback { selected ->
                 runWithProgress(
                     project,
-                    VoltaBundle.message("node.switch.title", selected),
+                    t("node.switch.title", selected),
                     run = {
                         // 简化条件判断，消除currentProject临时变量
                         if (recommendedVersionText != null && selected == recommendedVersionText) {

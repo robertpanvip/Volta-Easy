@@ -1,6 +1,7 @@
 package com.pan.volta
 
 import com.intellij.DynamicBundle
+import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.PropertyKey
 
 class VoltaBundle : DynamicBundle("messages.VoltaBundle") {
@@ -8,4 +9,7 @@ class VoltaBundle : DynamicBundle("messages.VoltaBundle") {
         private val INSTANCE = VoltaBundle()
         fun message(@PropertyKey(resourceBundle = "messages.VoltaBundle") key: String, vararg params: Any) = INSTANCE.getMessage(key, *params)
     }
+}
+fun t(@PropertyKey(resourceBundle = "messages.VoltaBundle") key: String, vararg params: Any): @Nls String {
+    return VoltaBundle.message(key, *params)
 }

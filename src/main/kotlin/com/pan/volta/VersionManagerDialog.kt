@@ -15,7 +15,7 @@ class ManageNodeVersionsAction(
     private val project: Project,
     private val service: VoltaService,
     val installNewVersion: () -> Unit
-) : AnAction("Manage Installed Versions…") {
+) : AnAction(t("manage.installed.versions")) {
 
     override fun actionPerformed(e: AnActionEvent) {
         // 打开 Dialog
@@ -34,7 +34,7 @@ class NodeVersionManagerDialog(
     private val list = JBList(listModel)
 
     init {
-        title = "Manage Node Versions"
+        title = t("manage.node.versions")
         // 初始化 list 数据
         service.getInstalledVersions().forEach { listModel.addElement(it) }
 
@@ -51,19 +51,19 @@ class NodeVersionManagerDialog(
             .setRemoveAction {
                 val selected = list.selectedValue ?: return@setRemoveAction
                 if (selected.endsWith("(default)")) {
-                    JOptionPane.showMessageDialog(null, "default can not delete")
+                    JOptionPane.showMessageDialog(null, t("default.can.not.delete"))
                     return@setRemoveAction
                 }
                 // 删除选中版本
                 val confirmed = JOptionPane.showConfirmDialog(
                     null,
-                    "Delete Node $selected?",
-                    "Confirm Delete",
+                    t("delete.node.selected",selected),
+                    t("confirm.delete"),
                     JOptionPane.YES_NO_OPTION
                 )
                 if (confirmed == JOptionPane.YES_OPTION) {
                     runWithProgress(
-                        project, "uninstall Node $selected ...",
+                        project, t("uninstall.node.selected",selected),
                         run = {
                             try {
                                 service.uninstallVersion(selected)
