@@ -144,6 +144,7 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                 DumbService.getInstance(project).runWhenSmart { updateLabelText() }
                 return
             }
+
             runWithProgress(
                 project,
                 t("node.switch.title", "--"),
@@ -162,8 +163,11 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
                     versionText
                 },
                 onOk = { result ->
-                    label.text = " ${result.replace("v", "", true)} "
-
+                    if (result.contains("Volta")) {
+                        label.text = "Volta"
+                    } else {
+                        label.text = " ${result.replace("v", "", true)} "
+                    }
                     label.toolTipText = t("node.version.popover", result)
                 })
 

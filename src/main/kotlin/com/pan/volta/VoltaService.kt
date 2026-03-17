@@ -3,6 +3,7 @@ package com.pan.volta
 import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Paths
 
 // ---------------- Semver 手写 ----------------
@@ -91,14 +92,35 @@ class VoltaService(private val project: Project) {
     fun getCurrentNodeVersion(): String {
         val output = execute(arrayOf("volta", "list", "node", "--current"),8)
         if (output.exitCode != 0) return "Unknown"
+
         // 用正则提取 vX.Y.Z
         val regex = Regex("""node@(\d+\.\d+\.\d+)""")
         val version = regex.find(output.stdout.trim())?.groups?.get(1)?.value ?: "Unknown"
         return version
     }
+    val os = System.getProperty("os.name").lowercase()
+
+    fun isVoltaInstalledFast(): Boolean {
+        val path = when {
+            os.contains("win") -> {
+                val localAppData = System.getenv("LOCALAPPDATA") ?: return false
+                Paths.get(localAppData, "Volta", "bin", "volta.exe")
+            }
+
+            else -> {
+                val home = System.getProperty("user.home") ?: return false
+                Paths.get(home, ".volta", "bin", "volta")
+            }
+        }
+
+        return Files.exists(path)
+    }
 
     fun isVoltaInstalled(): Boolean {
-        val output = execute(arrayOf("volta", "--version"))
+        if(isVoltaInstalledFast()){
+            return true
+        }
+        val output = execute(arrayOf("volta", "--version"),40)
         return output.exitCode == 0 && output.stdout.trim().matches(Regex("^\\d+\\.\\d+\\.\\d+.*$"))
     }
 
