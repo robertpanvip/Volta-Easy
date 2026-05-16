@@ -58,6 +58,28 @@ fun getVersionByFileName(fileName: String): String? {
 }
 
 class VoltaService(private val project: Project) {
+    companion object {
+        @Volatile
+        private var cachedVersions: List<String>? = null
+        @Volatile
+        private var versionsCacheTimestamp: Long = 0
+        @Volatile
+        private var cachedRecommendedVersion: String? = null
+        @Volatile
+        private var recommendedVersionTimestamp: Long = 0
+        private const val cacheDuration = 30000
+        
+        fun preloadStaticVersions(project: Project) {
+            Thread {
+                try {
+                    val service = VoltaService(project)
+                    service.getInstalledVersions()
+                    service.getProjectRecommendedVersion()
+                } catch (_: Exception) {
+                }
+            }.start()
+        }
+    }
 
     fun installNodeFromZip(zipPath: String) {
         val zipFile = File(zipPath)
@@ -88,6 +110,9 @@ class VoltaService(private val project: Project) {
         if (exitCode != 0) {
             throw RuntimeException("Volta install failed with exit code $exitCode")
         }
+        
+        clearCache()
+        preloadVersions()
     }
 
     fun getCurrentNodeVersion(): String {
@@ -126,27 +151,56 @@ class VoltaService(private val project: Project) {
     }
 
     fun getInstalledVersions(): List<String> {
+        val now = System.currentTimeMillis()
+        if (cachedVersions != null && now - versionsCacheTimestamp < cacheDuration) {
+            return cachedVersions!!
+        }
+        
         val output = execute(arrayOf("volta", "list", "node", "--format", "plain"))
         if (output.exitCode != 0) return emptyList()
 
-        return output.stdout.lines()
+        val versions = output.stdout.lines()
             .filter { it.trim().isNotEmpty() && it.contains("@") }
             .map { it.trim().substringAfter("@") }
             .map { if (it.startsWith("v")) it else "v$it" }
             .sortedDescending()
+        
+        cachedVersions = versions
+        versionsCacheTimestamp = now
+        return versions
+    }
+
+    fun preloadVersions() {
+        Thread {
+            try {
+                getInstalledVersions()
+            } catch (_: Exception) {
+            }
+        }.start()
+    }
+
+    fun clearCache() {
+        cachedVersions = null
+        versionsCacheTimestamp = 0
     }
 
     fun switchVersion(version: String): String {
         // Volta 没有独立的 "use"，项目级用 pin，全局用 install（这里假设用全局 install 作为切换）
         val output = execute(arrayOf("volta", "install", "node@$version"))
-        return if (output.exitCode == 0) "成功切换到 Node $version（Volta）"
+        val result = if (output.exitCode == 0) "成功切换到 Node $version（Volta）"
         else "切换失败：${output.stderr}"
+        clearCache()
+        preloadVersions()
+        return result
     }
 
     fun installVersion(version: String): String {
         val output = execute(arrayOf("volta", "install", "node@$version"))
-        return if (output.exitCode == 0) "安装成功：Node $version"
+        val result = if (output.exitCode == 0) "安装成功：Node $version"
         else "安装失败：${output.stderr}"
+        clearCache()
+        preloadVersions()
+        return result
     }
 
     fun uninstallVersion(version: String): String {
@@ -154,18 +208,22 @@ class VoltaService(private val project: Project) {
             // 1. 尝试用 Volta CLI 卸载
             val output = execute(arrayOf("volta", "uninstall", "node@$version"))
 
-            if (output.exitCode == 0) {
-                return "卸载成功：Node $version"
+            val result = if (output.exitCode == 0) {
+                "卸载成功：Node $version"
+            } else {
+                // CLI 卸载失败，尝试手动删除 image
+                val voltaHome = getVoltaHome()
+                // 去掉前缀 v
+                val cleanVersion = version.removePrefix("v")
+                val imageDir = File(voltaHome, "tools/image/node/$cleanVersion")
+                if (imageDir.exists()) {
+                    imageDir.deleteRecursively()
+                }
+                "卸载完成（手动删除）：Node $version"
             }
-            // CLI 卸载失败，尝试手动删除 image
-            val voltaHome = getVoltaHome()
-            // 去掉前缀 v
-            val cleanVersion = version.removePrefix("v")
-            val imageDir = File(voltaHome, "tools/image/node/$cleanVersion")
-            if (imageDir.exists()) {
-                imageDir.deleteRecursively()
-            }
-            return "卸载完成（手动删除）：Node $version"
+            clearCache()
+            preloadVersions()
+            return result
         } catch (e: Exception) {
             return "卸载失败：${e.message}"
         }
@@ -246,22 +304,35 @@ class VoltaService(private val project: Project) {
     }
 
     fun getProjectRecommendedVersion(): String? {
+        val now = System.currentTimeMillis()
+        if (cachedRecommendedVersion != null && now - recommendedVersionTimestamp < cacheDuration) {
+            return cachedRecommendedVersion
+        }
 
         // 优先 Volta 的 package.json "volta" 字段，其次 .nvmrc
         val pkgFile = File("${project.basePath}/package.json")
         if (!pkgFile.exists()) {
-            return null;
+            cachedRecommendedVersion = null
+            recommendedVersionTimestamp = now
+            return null
         }
         val pkgText = pkgFile.readText()
         val v = getPackageNodeVersion()
         if (v !== null) {
-            return v;
+            cachedRecommendedVersion = v
+            recommendedVersionTimestamp = now
+            return v
         }
 
         if (pkgFile.exists()) {
             try {
                 val match = Regex(""""node"\s*:\s*"([^"]+)"""").find(pkgText)
-                match?.groupValues?.get(1)?.let { return "v$it" }
+                val result = match?.groupValues?.get(1)?.let { "v$it" }
+                if (result != null) {
+                    cachedRecommendedVersion = result
+                    recommendedVersionTimestamp = now
+                    return result
+                }
             } catch (_: Exception) {
             }
         }
@@ -271,12 +342,15 @@ class VoltaService(private val project: Project) {
             try {
                 var ver = nvmrc.readText().trim()
                 if (!ver.startsWith("v")) ver = "v$ver"
+                cachedRecommendedVersion = ver
+                recommendedVersionTimestamp = now
                 return ver
             } catch (_: Exception) {
             }
         }
 
-
+        cachedRecommendedVersion = null
+        recommendedVersionTimestamp = now
         return null
     }
 

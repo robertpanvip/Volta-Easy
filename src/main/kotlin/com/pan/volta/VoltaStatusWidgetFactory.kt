@@ -74,6 +74,16 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
             javaClass
         )
 
+        init {
+            Thread {
+                try {
+                    service.getInstalledVersions()
+                    service.getProjectRecommendedVersion()
+                } catch (_: Exception) {
+                }
+            }.start()
+        }
+
         private val label: JBLabel = JBLabel(" Node: Loading... ", nodeIcon, JBLabel.LEFT).apply {
             toolTipText = t("node.switch.click")
             font = Font("Segoe UI", Font.PLAIN, 12)
@@ -83,12 +93,10 @@ class VoltaStatusWidgetFactory : StatusBarWidgetFactory {
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.clickCount != 1) return
-                    SwingUtilities.invokeLater {
-                        if (!service.isVoltaInstalled()) {
-                            showVoltaInstallPrompt()
-                        } else {
-                            versionPopup.show(label)
-                        }
+                    if (!service.isVoltaInstalled()) {
+                        showVoltaInstallPrompt()
+                    } else {
+                        versionPopup.show(label)
                     }
                 }
             })
